@@ -26,6 +26,7 @@ OUTPUT_DIR = $(OBJ_DIR) $(BIN_DIR)
 all:
 	make directories
 	make $(BIN_DIR)/seq
+	make $(BIN_DIR)/pt
 
 .PHONY: directories
 directories:
@@ -34,9 +35,13 @@ directories:
 	touch $(BIN_DIR)/centorids.txt
 
 # BIN/Executable Rules
-# matrix library exec
+# seq library exec
 $(BIN_DIR)/seq: $(OBJ_DIR)/main_sequential.o $(OBJ_DIR)/lab1_sequential.o $(OBJ_DIR)/lab1_io.o
 	$(CXX) $^ -o $@ $(SHARED_LINK_FLAGS)
+
+# pt library exec
+$(BIN_DIR)/pt: $(OBJ_DIR)/main_pthread.o $(OBJ_DIR)/lab1_pthread.o $(OBJ_DIR)/lab1_io.o
+	$(CXX) $^ -o $@ $(SHARED_LINK_FLAGS) -lpthread
 
 # OBJ/object Rules
 $(OBJ_DIR)/%.o: $(SRC_DIR)/%.cpp

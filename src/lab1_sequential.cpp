@@ -50,7 +50,7 @@ int** centroids, int* num_iterations) {
 
     // update centroids
     *num_iterations = -1;
-    double error = 100000.0;
+    double error = std::numeric_limits<double>::max();
 
     std::vector<int> partitionEntries(N);
     std::vector<int> numOfPointsInPartition(K);
