@@ -1,6 +1,8 @@
 # Project specific
 .vscode/
 data/sample_dataset_*
+bin/
+build/
 
 # Prerequisites
 *.d
