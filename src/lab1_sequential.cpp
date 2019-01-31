@@ -8,11 +8,12 @@ extern "C" {
 #include <time.h>
 #include <limits>
 #include <cmath>
+#include <iostream>
 
 void kmeans_sequential(int N, int K, int* data_points, int** data_point_cluster, 
 int** centroids, int* num_iterations) {
-    std::vector<int*>* centroidListHeads = new std::vector<int*>();
-    int* currentCentroids = (int*) malloc(sizeof(int)*K*3);
+    std::vector<int>* centroidSaveDB = new std::vector<int>();
+    std::vector<double> currentCentroidsDouble(3*K);
     
     // Initialize centroids
     srand(time(0));
@@ -26,9 +27,9 @@ int** centroids, int* num_iterations) {
         // check no centroid is repeated
         bool matched = false;
         for (int i=0; i<numRandomCentInit; i++) {
-            int iThCurrCentX = *(currentCentroids+(3*i));
-            int iThCurrCentY = *(currentCentroids+(3*i)+1);
-            int iThCurrCentZ = *(currentCentroids+(3*i)+2);
+            int iThCurrCentX = currentCentroidsDouble[(3*i)];
+            int iThCurrCentY = currentCentroidsDouble[(3*i)+1];
+            int iThCurrCentZ = currentCentroidsDouble[(3*i)+2];
             if (pickedX==iThCurrCentX & pickedY==iThCurrCentY & pickedZ==iThCurrCentZ) {
                 matched = true;
                 break;
@@ -37,34 +38,33 @@ int** centroids, int* num_iterations) {
 
         // pickable centroid found
         if (!matched) {
-            *(currentCentroids+(3*numRandomCentInit)) = pickedX;
-            *(currentCentroids+(3*numRandomCentInit)+1) = pickedY;
-            *(currentCentroids+(3*numRandomCentInit)+2) = pickedZ;
+            currentCentroidsDouble.push_back(pickedX);
+            currentCentroidsDouble.push_back(pickedY);
+            currentCentroidsDouble.push_back(pickedZ);
             numRandomCentInit++;
         }
     }
 
     // successfully pick random points as centroids (Forgy)
-    centroidListHeads->push_back(currentCentroids);
+    centroidSaveDB->insert(centroidSaveDB->end(), currentCentroidsDouble.begin(), currentCentroidsDouble.end());
 
     // update centroids
     *num_iterations = -1;
-    int maxError = 4;
+    double maxError = 4.0;
 
     std::vector<int> partitionEntries(N);
-    std::vector<std::tuple<int, int, int>> sumOfPointsInPartition(K);
     std::vector<int> numOfPointsInPartition(K);
+    std::vector<double> prevCentroidsDouble(3*K);
     bool zeroThIteration = true;
 
-    while (maxError>3) {
+    while (*num_iterations<1000) {
         if (!zeroThIteration) {
             // compute centroids
-            int* nextCentroids = (int*) malloc(sizeof(int)*K*3);
             for (int i=0; i<K; i++) {
                 // initialize memory of next set of centroids this will contain sum of points of partition temporarily
-                *(nextCentroids+(3*i)) = 0;
-                *(nextCentroids+(3*i)+1) = 0;
-                *(nextCentroids+(3*i)+2) = 0;
+                currentCentroidsDouble[(3*i)] = 0;
+                currentCentroidsDouble[(3*i)+1] = 0;
+                currentCentroidsDouble[(3*i)+2] = 0;
                 numOfPointsInPartition[i] = 0;
             }
             
@@ -74,26 +74,25 @@ int** centroids, int* num_iterations) {
                 int pickedX = *(data_points+(3*i));
                 int pickedY = *(data_points+(3*i)+1);
                 int pickedZ = *(data_points+(3*i)+2);
-                *(nextCentroids+(3*partitionId)) += pickedX;
-                *(nextCentroids+(3*partitionId)+1) += pickedY;
-                *(nextCentroids+(3*partitionId)+2) += pickedZ;
+                currentCentroidsDouble[(3*partitionId)] += pickedX;
+                currentCentroidsDouble[(3*partitionId)+1] += pickedY;
+                currentCentroidsDouble[(3*partitionId)+2] += pickedZ;
                 numOfPointsInPartition[partitionId] += 1;
             }
 
             // calculate avgs i.e. centroids
             for (int i=0; i<K; i++) {
-                int iThNextCentX = *(nextCentroids+(3*i));
-                int iThNextCentY = *(nextCentroids+(3*i)+1);
-                int iThNextCentZ = *(nextCentroids+(3*i)+2);
-                float denominator = float(numOfPointsInPartition[i]);
-                iThNextCentX = round(float(iThNextCentX)/denominator);
-                iThNextCentY = round(float(iThNextCentY)/denominator);
-                iThNextCentZ = round(float(iThNextCentZ)/denominator);
+                int iThNextCentX = currentCentroidsDouble[(3*i)];
+                int iThNextCentY = currentCentroidsDouble[(3*i)+1];
+                int iThNextCentZ = currentCentroidsDouble[(3*i)+2];
+                double denominator = double(numOfPointsInPartition[i]);
+                iThNextCentX = round(double(iThNextCentX)/denominator);
+                iThNextCentY = round(double(iThNextCentY)/denominator);
+                iThNextCentZ = round(double(iThNextCentZ)/denominator);
             }
 
             // complete update of centroids
-            centroidListHeads->push_back(nextCentroids);
-            currentCentroids = nextCentroids;
+            centroidSaveDB->insert(centroidSaveDB->end(), currentCentroidsDouble.begin(), currentCentroidsDouble.end());
         } else {
             // skip above on 0th iteration as we have to use init centroids
             zeroThIteration = false;
@@ -101,15 +100,15 @@ int** centroids, int* num_iterations) {
 
         // assign partition
         for (int i=0; i<N; i++) {
-            float minDistance = std::numeric_limits<float>::max();
+            double minDistance = std::numeric_limits<double>::max();
             int pickedX = *(data_points+(3*i));
             int pickedY = *(data_points+(3*i)+1);
             int pickedZ = *(data_points+(3*i)+2);
             for (int j=0; j<K; j++) {
-                int jThCurrCentX = *(currentCentroids+(3*j));
-                int jThCurrCentY = *(currentCentroids+(3*j)+1);
-                int jThCurrCentZ = *(currentCentroids+(3*j)+2);
-                float currCentDistance = sqrt(powf(pickedX-jThCurrCentX,2)+powf(pickedY-jThCurrCentY,2)+powf(pickedZ-jThCurrCentZ,2));
+                double jThCurrCentX = currentCentroidsDouble[(3*j)];
+                double jThCurrCentY = currentCentroidsDouble[(3*j)+1];
+                double jThCurrCentZ = currentCentroidsDouble[(3*j)+2];
+                double currCentDistance = pow(pickedX-jThCurrCentX,2)+pow(pickedY-jThCurrCentY,2)+pow(pickedZ-jThCurrCentZ,2);
                 if (currCentDistance<minDistance) {
                     minDistance = currCentDistance;
                     partitionEntries[i] = j;
@@ -118,24 +117,25 @@ int** centroids, int* num_iterations) {
         }
         
         // error computation
-        int* prevCentroids = currentCentroids-K*3;
-        maxError = 3;
+        maxError = 3.0;
         for (int i=0; i<K; i++) {
-            int iThCurrCentX = *(currentCentroids+(3*i));
-            int iThCurrCentY = *(currentCentroids+(3*i)+1);
-            int iThCurrCentZ = *(currentCentroids+(3*i)+2);
-            int iThPrevCentX = *(prevCentroids+(3*i));
-            int iThPrevCentY = *(prevCentroids+(3*i)+1);
-            int iThPrevCentZ = *(prevCentroids+(3*i)+2);
-            int eachCentroidError = abs(iThCurrCentX-iThPrevCentX) + abs(iThCurrCentY-iThPrevCentY) + abs(iThCurrCentZ-iThPrevCentZ);
+            double iThCurrCentX = currentCentroidsDouble[(3*i)];
+            double iThCurrCentY = currentCentroidsDouble[(3*i)+1];
+            double iThCurrCentZ = currentCentroidsDouble[(3*i)+2];
+            double iThPrevCentX = prevCentroidsDouble[(3*i)];
+            double iThPrevCentY = prevCentroidsDouble[(3*i)+1];
+            double iThPrevCentZ = prevCentroidsDouble[(3*i)+2];
+            double eachCentroidError = pow(iThCurrCentX-iThPrevCentX, 2) + pow(iThCurrCentY-iThPrevCentY, 2) + pow(iThCurrCentZ-iThPrevCentZ, 2);
             if (eachCentroidError>maxError) {
                 maxError = eachCentroidError;
             }
         }
+        // copy current centroid, they are prev for next iteration
+        prevCentroidsDouble = currentCentroidsDouble;
         *num_iterations += 1;
     }
 
-    int* clusterPartIdList = (int*) malloc(sizeof(int)*K*4);
+    int* clusterPartIdList = (int*) malloc(sizeof(int)*N*4);
     for (int i=0; i<N; i++) {
         int partitionId = partitionEntries[i];
         int pickedX = *(data_points+(3*i));
@@ -146,6 +146,6 @@ int** centroids, int* num_iterations) {
         *(clusterPartIdList+(4*i)+2) = pickedZ;
         *(clusterPartIdList+(4*i)+3) = partitionId;
     }
-    centroids = centroidListHeads->data();
+    *centroids = centroidSaveDB->data();
     *data_point_cluster = clusterPartIdList;
 }
