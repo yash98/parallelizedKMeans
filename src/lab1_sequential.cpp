@@ -1,4 +1,6 @@
-#include "lab1_sequential.h"
+extern "C" {
+    #include "lab1_sequential.h"
+}
 
 #include <vector>
 #include <tuple>
@@ -16,7 +18,7 @@ int** centroids, int* num_iterations) {
     srand(time(0));
     int numRandomCentInit = 0;
     while(numRandomCentInit<K) {
-        int pickIndex = rand();
+        int pickIndex = rand()%N;
         int pickedX = *(data_points+(3*pickIndex));
         int pickedY = *(data_points+(3*pickIndex)+1);
         int pickedZ = *(data_points+(3*pickIndex)+2);
@@ -132,4 +134,18 @@ int** centroids, int* num_iterations) {
         }
         *num_iterations += 1;
     }
+
+    int* clusterPartIdList = (int*) malloc(sizeof(int)*K*4);
+    for (int i=0; i<N; i++) {
+        int partitionId = partitionEntries[i];
+        int pickedX = *(data_points+(3*i));
+        int pickedY = *(data_points+(3*i)+1);
+        int pickedZ = *(data_points+(3*i)+2);
+        *(clusterPartIdList+(4*i)) = pickedX;
+        *(clusterPartIdList+(4*i+1)) = pickedY;
+        *(clusterPartIdList+(4*i)+2) = pickedZ;
+        *(clusterPartIdList+(4*i)+3) = partitionId;
+    }
+    centroids = centroidListHeads->data();
+    *data_point_cluster = clusterPartIdList;
 }

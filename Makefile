@@ -9,7 +9,7 @@ CXX = g++
 
 CXX_ASSEMBLER_FLAGS := $(ADD_G++_FLAGS) 
 
-# INCLUDE_FLAGS = 
+# INCLUDE_FLAGS = -I src/
 # SHARED_LINK_FLAGS = 
 
 DEBUG ?= 0
@@ -33,6 +33,8 @@ all:
 .PHONY: directories
 directories:
 	mkdir -p $(OUTPUT_DIR)
+	touch $(BIN_DIR)/clusters.txt
+	touch $(BIN_DIR)/centorids.txt
 
 # BIN/Executable Rules
 # matrix library exec
@@ -44,7 +46,7 @@ $(OBJ_DIR)/%.o: $(SRC_DIR)/%.cpp
 	$(CXX) $(CXX_ASSEMBLER_FLAGS) -c $^ -o $@ $(INCLUDE_FLAGS)
 
 $(OBJ_DIR)/%.o: $(SRC_DIR)/%.c
-	$(CXX) $(CXX_ASSEMBLER_FLAGS) -c $^ -o $@ $(INCLUDE_FLAGS)
+	gcc $(CXX_ASSEMBLER_FLAGS) -c $^ -o $@ $(INCLUDE_FLAGS)
 
 .PHONY: clean
 clean:
