@@ -50,14 +50,14 @@ int** centroids, int* num_iterations) {
 
     // update centroids
     *num_iterations = -1;
-    double maxError = 4.0;
+    double error = 100000.0;
 
     std::vector<int> partitionEntries(N);
     std::vector<int> numOfPointsInPartition(K);
     std::vector<double> prevCentroidsDouble(3*K);
     bool zeroThIteration = true;
 
-    while (*num_iterations<1000) {
+    while (error>1.0) {
         if (!zeroThIteration) {
             // compute centroids
             for (int i=0; i<K; i++) {
@@ -117,7 +117,7 @@ int** centroids, int* num_iterations) {
         }
         
         // error computation
-        maxError = 3.0;
+        error = 0.0;
         for (int i=0; i<K; i++) {
             double iThCurrCentX = currentCentroidsDouble[(3*i)];
             double iThCurrCentY = currentCentroidsDouble[(3*i)+1];
@@ -125,11 +125,9 @@ int** centroids, int* num_iterations) {
             double iThPrevCentX = prevCentroidsDouble[(3*i)];
             double iThPrevCentY = prevCentroidsDouble[(3*i)+1];
             double iThPrevCentZ = prevCentroidsDouble[(3*i)+2];
-            double eachCentroidError = pow(iThCurrCentX-iThPrevCentX, 2) + pow(iThCurrCentY-iThPrevCentY, 2) + pow(iThCurrCentZ-iThPrevCentZ, 2);
-            if (eachCentroidError>maxError) {
-                maxError = eachCentroidError;
-            }
+            error += pow(iThCurrCentX-iThPrevCentX, 2) + pow(iThCurrCentY-iThPrevCentY, 2) + pow(iThCurrCentZ-iThPrevCentZ, 2);
         }
+        std::cerr << error << std::endl;
         // copy current centroid, they are prev for next iteration
         prevCentroidsDouble = currentCentroidsDouble;
         *num_iterations += 1;
