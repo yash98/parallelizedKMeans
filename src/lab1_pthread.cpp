@@ -66,6 +66,28 @@ void* assignPartition(void* tid) {
     return NULL;
 }
 
+void* writeClusterList(void* tid) {
+    int* id = (int*) tid;
+    int istart = (Ng/threadNumG)*(*id);
+    int iend;
+    if (*id==threadNumG-1){
+        iend = Ng;
+    } else {
+        iend = (Ng/threadNumG)*((*id)+1);
+    }
+    for (int i=istart; i<iend; i++) {
+        int partitionId = (*partitionEntries)[i];
+        int pickedX = *(data_pointsG+(3*i));
+        int pickedY = *(data_pointsG+(3*i)+1);
+        int pickedZ = *(data_pointsG+(3*i)+2);
+        *(clusterPartIdList+(4*i)) = pickedX;
+        *(clusterPartIdList+(4*i+1)) = pickedY;
+        *(clusterPartIdList+(4*i)+2) = pickedZ;
+        *(clusterPartIdList+(4*i)+3) = partitionId;
+    }
+    return NULL;
+}
+
 void kmeans_pthread(int num_threads, int N, int K, int* data_points, int** data_point_cluster, 
 int** centroids, int* num_iterations) {
     // pthread init and global init
@@ -188,17 +210,20 @@ int** centroids, int* num_iterations) {
         prevCentroidsDouble = currentCentroidsDouble;
         *num_iterations += 1;
     }
+    prevCentroidsDouble->clear();
+    delete prevCentroidsDouble;
+    delete currentCentroidsDouble;
 
     clusterPartIdList = (int*) malloc(sizeof(int)*N*4);
-    for (int i=0; i<N; i++) {
-        int partitionId = (*partitionEntries)[i];
-        int pickedX = *(data_points+(3*i));
-        int pickedY = *(data_points+(3*i)+1);
-        int pickedZ = *(data_points+(3*i)+2);
-        *(clusterPartIdList+(4*i)) = pickedX;
-        *(clusterPartIdList+(4*i+1)) = pickedY;
-        *(clusterPartIdList+(4*i)+2) = pickedZ;
-        *(clusterPartIdList+(4*i)+3) = partitionId;
+    // write data point with clusters
+    // threading
+    for (int i=0; i<num_threads; i++) {
+        tidArr[i] = i;
+        pthread_create(&multThreads[i], NULL, writeClusterList, &tidArr[i]);
+    }
+    // synchronize
+    for (int i = 0; i < num_threads; i ++) {
+        pthread_join(multThreads[i], NULL);
     }
 
     *centroids = centroidSaveDB->data();
