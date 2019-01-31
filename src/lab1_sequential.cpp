@@ -38,9 +38,9 @@ int** centroids, int* num_iterations) {
 
         // pickable centroid found
         if (!matched) {
-            currentCentroidsDouble.push_back(pickedX);
-            currentCentroidsDouble.push_back(pickedY);
-            currentCentroidsDouble.push_back(pickedZ);
+            currentCentroidsDouble[3*numRandomCentInit] = pickedX;
+            currentCentroidsDouble[3*numRandomCentInit+1] = pickedY;
+            currentCentroidsDouble[3*numRandomCentInit+2] = pickedZ;
             numRandomCentInit++;
         }
     }
@@ -82,13 +82,13 @@ int** centroids, int* num_iterations) {
 
             // calculate avgs i.e. centroids
             for (int i=0; i<K; i++) {
-                int iThNextCentX = currentCentroidsDouble[(3*i)];
-                int iThNextCentY = currentCentroidsDouble[(3*i)+1];
-                int iThNextCentZ = currentCentroidsDouble[(3*i)+2];
+                int iThCurrCentX = currentCentroidsDouble[(3*i)];
+                int iThCurrCentY = currentCentroidsDouble[(3*i)+1];
+                int iThCurrCentZ = currentCentroidsDouble[(3*i)+2];
                 double denominator = double(numOfPointsInPartition[i]);
-                iThNextCentX = round(double(iThNextCentX)/denominator);
-                iThNextCentY = round(double(iThNextCentY)/denominator);
-                iThNextCentZ = round(double(iThNextCentZ)/denominator);
+                currentCentroidsDouble[(3*i)] = round(double(iThCurrCentX)/denominator);
+                currentCentroidsDouble[(3*i)+1] = round(double(iThCurrCentY)/denominator);
+                currentCentroidsDouble[(3*i)+2] = round(double(iThCurrCentZ)/denominator);
             }
 
             // complete update of centroids
