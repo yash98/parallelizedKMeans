@@ -93,9 +93,6 @@ int** centroids, int* num_iterations) {
 
             // complete update of centroids
             centroidSaveDB->insert(centroidSaveDB->end(), currentCentroidsDouble.begin(), currentCentroidsDouble.end());
-        } else {
-            // skip above on 0th iteration as we have to use init centroids
-            zeroThIteration = false;
         }
 
         // assign partition
@@ -117,17 +114,20 @@ int** centroids, int* num_iterations) {
         }
         
         // error computation
-        error = 0.0;
-        for (int i=0; i<K; i++) {
-            double iThCurrCentX = currentCentroidsDouble[(3*i)];
-            double iThCurrCentY = currentCentroidsDouble[(3*i)+1];
-            double iThCurrCentZ = currentCentroidsDouble[(3*i)+2];
-            double iThPrevCentX = prevCentroidsDouble[(3*i)];
-            double iThPrevCentY = prevCentroidsDouble[(3*i)+1];
-            double iThPrevCentZ = prevCentroidsDouble[(3*i)+2];
-            error += pow(iThCurrCentX-iThPrevCentX, 2) + pow(iThCurrCentY-iThPrevCentY, 2) + pow(iThCurrCentZ-iThPrevCentZ, 2);
+        if (!zeroThIteration) {
+            error = 0.0;
+            for (int i=0; i<K; i++) {
+                double iThCurrCentX = currentCentroidsDouble[(3*i)];
+                double iThCurrCentY = currentCentroidsDouble[(3*i)+1];
+                double iThCurrCentZ = currentCentroidsDouble[(3*i)+2];
+                double iThPrevCentX = prevCentroidsDouble[(3*i)];
+                double iThPrevCentY = prevCentroidsDouble[(3*i)+1];
+                double iThPrevCentZ = prevCentroidsDouble[(3*i)+2];
+                error += pow(iThCurrCentX-iThPrevCentX, 2) + pow(iThCurrCentY-iThPrevCentY, 2) + pow(iThCurrCentZ-iThPrevCentZ, 2);
+            }
+        } else {
+            zeroThIteration = false;
         }
-        std::cerr << error << std::endl;
         // copy current centroid, they are prev for next iteration
         prevCentroidsDouble = currentCentroidsDouble;
         *num_iterations += 1;
