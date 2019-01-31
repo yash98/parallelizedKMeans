@@ -3,11 +3,7 @@
 CXX = g++
 
 #Flags
-# CXX_LINKER_FLAGS
-
-# Remove warning and add -Wall Flag
-
-CXX_ASSEMBLER_FLAGS := $(ADD_G++_FLAGS) 
+CXX_ASSEMBLER_FLAGS := -std=c++11 $(ADD_G++_FLAGS) 
 
 # INCLUDE_FLAGS = -I src/
 # SHARED_LINK_FLAGS = 
@@ -15,6 +11,7 @@ CXX_ASSEMBLER_FLAGS := $(ADD_G++_FLAGS)
 DEBUG ?= 0
 ifeq ($(DEBUG), 1)
     CXX_ASSEMBLER_FLAGS +=-g
+	GCC_ASSEMBLER_FLAGS +=-g
 endif
 
 
@@ -46,7 +43,7 @@ $(OBJ_DIR)/%.o: $(SRC_DIR)/%.cpp
 	$(CXX) $(CXX_ASSEMBLER_FLAGS) -c $^ -o $@ $(INCLUDE_FLAGS)
 
 $(OBJ_DIR)/%.o: $(SRC_DIR)/%.c
-	gcc $(CXX_ASSEMBLER_FLAGS) -c $^ -o $@ $(INCLUDE_FLAGS)
+	gcc $(GCC_ASSEMBLER_FLAGS) -c $^ -o $@ $(INCLUDE_FLAGS)
 
 .PHONY: clean
 clean:
