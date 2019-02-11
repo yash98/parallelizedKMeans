@@ -98,11 +98,16 @@ int** centroids, int* num_iterations) {
     Kg = K;
     threadNumG = num_threads;
 
+    cacheLineSizeBlock = (int) ceil(double(sysconf(_SC_LEVEL1_DCACHE_LINESIZE))/double(sizeof(double)));
+
     std::vector<int>* centroidSaveDB = new std::vector<int>();
+    centroidSaveDB->reserve(3*K*201);
     currentCentroidsDouble = new std::vector<double>(3*K);
+    currentCentroidsDouble = new std::vector<double>(K*cacheLineSizeBlock);
     
     // Initialize centroids
-    srand(time(0));
+    // srand(time(0));
+    srand(0);
     int numRandomCentInit = 0;
     while(numRandomCentInit<K) {
         int pickIndex = rand()%N;

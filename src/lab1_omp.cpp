@@ -34,7 +34,8 @@ int** centroids, int* num_iterations) {
     currentCentroidsDouble = new std::vector<double>(3*K);
     
     // Initialize centroids
-    srand(time(0));
+    // srand(time(0));
+    srand(0);
     int numRandomCentInit = 0;
     while(numRandomCentInit<K) {
         int pickIndex = rand()%N;
