@@ -36,7 +36,6 @@ int** centroids, int* num_iterations) {
 
     std::vector<int>* centroidSaveDB = new std::vector<int>();
     centroidSaveDB->reserve(3*K*201);
-    currentCentroidsDouble = new std::vector<double>(3*K);
     currentCentroidsDouble = new std::vector<double>(K*cacheLineSizeBlock);
 
     // Initialize centroids
@@ -85,10 +84,10 @@ int** centroids, int* num_iterations) {
     std::vector<double>* prevCentroidsDouble;
     bool zeroThIteration = true;
 
-    while (error>1.0) {
+    while (error>1.0 && (*num_iterations<200)) {
         if (!zeroThIteration) {
             // compute centroids
-            currentCentroidsDouble = new std::vector<double>(3*K);
+            currentCentroidsDouble = new std::vector<double>(cacheLineSizeBlock*K);
             for (int i=0; i<K; i++) {
                 // initialize memory of next set of centroids this will contain sum of points of partition temporarily
                 (*numOfPointsInPartition)[i] = 0;
@@ -115,9 +114,9 @@ int** centroids, int* num_iterations) {
 
             // calculate avgs i.e. centroids
             for (int i=0; i<K; i++) {
-                int iThCurrCentX = (*currentCentroidsDouble)[(3*i)];
-                int iThCurrCentY = (*currentCentroidsDouble)[(3*i)+1];
-                int iThCurrCentZ = (*currentCentroidsDouble)[(3*i)+2];
+                int iThCurrCentX = (*currentCentroidsDouble)[(cacheLineSizeBlock*i)];
+                int iThCurrCentY = (*currentCentroidsDouble)[(cacheLineSizeBlock*i)+1];
+                int iThCurrCentZ = (*currentCentroidsDouble)[(cacheLineSizeBlock*i)+2];
                 double denominator = double((*numOfPointsInPartition)[i]);
                 (*currentCentroidsDouble)[(cacheLineSizeBlock*i)] = round(double(iThCurrCentX)/denominator);
                 (*currentCentroidsDouble)[(cacheLineSizeBlock*i)+1] = round(double(iThCurrCentY)/denominator);
