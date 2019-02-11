@@ -10,6 +10,7 @@ extern "C" {
 #include <cmath>
 #include <iostream>
 #include <omp.h>
+#include <unistd.h>
 
 std::vector<int>* numOfPointsInPartition;
 std::vector<double>*currentCentroidsDouble;
@@ -19,6 +20,7 @@ int* data_pointsG;
 int Ng;
 int Kg;
 int* tidArr;
+int cacheLineSizeBlock;
 
 void kmeans_omp(int num_threads, int N, int K, int* data_points, int** data_point_cluster, 
 int** centroids, int* num_iterations) {
@@ -30,9 +32,13 @@ int** centroids, int* num_iterations) {
     Kg = K;
     omp_set_dynamic(0);
 
+    cacheLineSizeBlock = (int) ceil(double(sysconf(_SC_LEVEL1_DCACHE_LINESIZE))/double(sizeof(double)));
+
     std::vector<int>* centroidSaveDB = new std::vector<int>();
+    centroidSaveDB->reserve(3*K*201);
     currentCentroidsDouble = new std::vector<double>(3*K);
-    
+    currentCentroidsDouble = new std::vector<double>(K*cacheLineSizeBlock);
+
     // Initialize centroids
     // srand(time(0));
     srand(0);
@@ -46,9 +52,9 @@ int** centroids, int* num_iterations) {
         // check no centroid is repeated
         bool matched = false;
         for (int i=0; i<numRandomCentInit; i++) {
-            int iThCurrCentX = (*currentCentroidsDouble)[(3*i)];
-            int iThCurrCentY = (*currentCentroidsDouble)[(3*i)+1];
-            int iThCurrCentZ = (*currentCentroidsDouble)[(3*i)+2];
+            int iThCurrCentX = (*currentCentroidsDouble)[(cacheLineSizeBlock*i)];
+            int iThCurrCentY = (*currentCentroidsDouble)[(cacheLineSizeBlock*i)+1];
+            int iThCurrCentZ = (*currentCentroidsDouble)[(cacheLineSizeBlock*i)+2];
             if (pickedX==iThCurrCentX & pickedY==iThCurrCentY & pickedZ==iThCurrCentZ) {
                 matched = true;
                 break;
@@ -57,15 +63,18 @@ int** centroids, int* num_iterations) {
 
         // pickable centroid found
         if (!matched) {
-            (*currentCentroidsDouble)[3*numRandomCentInit] = pickedX;
-            (*currentCentroidsDouble)[3*numRandomCentInit+1] = pickedY;
-            (*currentCentroidsDouble)[3*numRandomCentInit+2] = pickedZ;
+            (*currentCentroidsDouble)[cacheLineSizeBlock*numRandomCentInit] = pickedX;
+            (*currentCentroidsDouble)[cacheLineSizeBlock*numRandomCentInit+1] = pickedY;
+            (*currentCentroidsDouble)[cacheLineSizeBlock*numRandomCentInit+2] = pickedZ;
             numRandomCentInit++;
         }
     }
 
     // successfully pick random points as centroids (Forgy)
-    centroidSaveDB->insert(centroidSaveDB->end(), currentCentroidsDouble->begin(), currentCentroidsDouble->end());
+    for (int i=0; i<K; i++) {
+        centroidSaveDB->insert(centroidSaveDB->end(), currentCentroidsDouble->begin()+i*cacheLineSizeBlock, 
+        currentCentroidsDouble->begin()+i*cacheLineSizeBlock+3);
+    }
 
     // update centroids
     *num_iterations = -1;
@@ -96,9 +105,9 @@ int** centroids, int* num_iterations) {
                         int pickedX = *(data_pointsG+(3*i));
                         int pickedY = *(data_pointsG+(3*i)+1);
                         int pickedZ = *(data_pointsG+(3*i)+2);
-                        (*currentCentroidsDouble)[(3*partitionId)] += pickedX;
-                        (*currentCentroidsDouble)[(3*partitionId)+1] += pickedY;
-                        (*currentCentroidsDouble)[(3*partitionId)+2] += pickedZ;
+                        (*currentCentroidsDouble)[(cacheLineSizeBlock*partitionId)] += pickedX;
+                        (*currentCentroidsDouble)[(cacheLineSizeBlock*partitionId)+1] += pickedY;
+                        (*currentCentroidsDouble)[(cacheLineSizeBlock*partitionId)+2] += pickedZ;
                         (*numOfPointsInPartition)[partitionId] += 1;
                     }
                 }
@@ -110,13 +119,16 @@ int** centroids, int* num_iterations) {
                 int iThCurrCentY = (*currentCentroidsDouble)[(3*i)+1];
                 int iThCurrCentZ = (*currentCentroidsDouble)[(3*i)+2];
                 double denominator = double((*numOfPointsInPartition)[i]);
-                (*currentCentroidsDouble)[(3*i)] = round(double(iThCurrCentX)/denominator);
-                (*currentCentroidsDouble)[(3*i)+1] = round(double(iThCurrCentY)/denominator);
-                (*currentCentroidsDouble)[(3*i)+2] = round(double(iThCurrCentZ)/denominator);
+                (*currentCentroidsDouble)[(cacheLineSizeBlock*i)] = round(double(iThCurrCentX)/denominator);
+                (*currentCentroidsDouble)[(cacheLineSizeBlock*i)+1] = round(double(iThCurrCentY)/denominator);
+                (*currentCentroidsDouble)[(cacheLineSizeBlock*i)+2] = round(double(iThCurrCentZ)/denominator);
             }
 
             // complete update of centroids
-            centroidSaveDB->insert(centroidSaveDB->end(), currentCentroidsDouble->begin(), currentCentroidsDouble->end());
+            for (int i=0; i<K; i++) {
+                centroidSaveDB->insert(centroidSaveDB->end(), currentCentroidsDouble->begin()+i*cacheLineSizeBlock, 
+                currentCentroidsDouble->begin()+i*cacheLineSizeBlock+3);
+            }
         }
 
         // assign partition
@@ -137,9 +149,9 @@ int** centroids, int* num_iterations) {
                 int pickedY = *(data_pointsG+(3*i)+1);
                 int pickedZ = *(data_pointsG+(3*i)+2);
                 for (int j=0; j<Kg; j++) {
-                    double jThCurrCentX = (*currentCentroidsDouble)[(3*j)];
-                    double jThCurrCentY = (*currentCentroidsDouble)[(3*j)+1];
-                    double jThCurrCentZ = (*currentCentroidsDouble)[(3*j)+2];
+                    double jThCurrCentX = (*currentCentroidsDouble)[(cacheLineSizeBlock*j)];
+                    double jThCurrCentY = (*currentCentroidsDouble)[(cacheLineSizeBlock*j)+1];
+                    double jThCurrCentZ = (*currentCentroidsDouble)[(cacheLineSizeBlock*j)+2];
                     double currCentDistance = pow(pickedX-jThCurrCentX,2)+pow(pickedY-jThCurrCentY,2)+pow(pickedZ-jThCurrCentZ,2);
                     if (currCentDistance<minDistance) {
                         minDistance = currCentDistance;
@@ -153,12 +165,12 @@ int** centroids, int* num_iterations) {
         if (!zeroThIteration) {
             error = 0.0;
             for (int i=0; i<K; i++) {
-                double iThCurrCentX = (*currentCentroidsDouble)[(3*i)];
-                double iThCurrCentY = (*currentCentroidsDouble)[(3*i)+1];
-                double iThCurrCentZ = (*currentCentroidsDouble)[(3*i)+2];
-                double iThPrevCentX = (*prevCentroidsDouble)[(3*i)];
-                double iThPrevCentY = (*prevCentroidsDouble)[(3*i)+1];
-                double iThPrevCentZ = (*prevCentroidsDouble)[(3*i)+2];
+                double iThCurrCentX = (*currentCentroidsDouble)[(cacheLineSizeBlock*i)];
+                double iThCurrCentY = (*currentCentroidsDouble)[(cacheLineSizeBlock*i)+1];
+                double iThCurrCentZ = (*currentCentroidsDouble)[(cacheLineSizeBlock*i)+2];
+                double iThPrevCentX = (*prevCentroidsDouble)[(cacheLineSizeBlock*i)];
+                double iThPrevCentY = (*prevCentroidsDouble)[(cacheLineSizeBlock*i)+1];
+                double iThPrevCentZ = (*prevCentroidsDouble)[(cacheLineSizeBlock*i)+2];
                 error += pow(iThCurrCentX-iThPrevCentX, 2) + pow(iThCurrCentY-iThPrevCentY, 2) + pow(iThCurrCentZ-iThPrevCentZ, 2);
             }
             prevCentroidsDouble->clear();
