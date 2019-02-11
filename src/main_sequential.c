@@ -3,6 +3,7 @@
 
 #include <stdlib.h>
 #include <time.h>
+#include <omp.h>
 
 /*
 	Arguments:
@@ -33,7 +34,7 @@ int main(int argc, char const *argv[])
 	int num_iterations;    //no of iterations performed by algo (to be computed)
 	//---------------------------------------------------------------------
 
-	clock_t start_time, end_time;
+	double start_time, end_time;
 	double computation_time;
 
 	K = atoi(argv[1]);
@@ -48,14 +49,14 @@ int main(int argc, char const *argv[])
 	*/
 	dataset_in (argv[2], &N, &data_points);
 
-	start_time = clock();
+	start_time = omp_get_wtime();
 	// /*
 	// 	*****************************************************
 	// 		TODO -- You must implement this function
 	// 	*****************************************************
 	// */
 	kmeans_sequential(N, K, data_points, &cluster_points, &centroids, &num_iterations);
-	end_time = clock();
+	end_time = omp_get_wtime();
 
 	// /*
 	// 	-- Pre-defined function --
@@ -64,8 +65,8 @@ int main(int argc, char const *argv[])
 	clusters_out (argv[3], N, cluster_points);
 	centroids_out (argv[4], K, num_iterations, centroids);
 
-	computation_time = ((double) (end_time - start_time)) / CLOCKS_PER_SEC;
-	printf("Time Taken: %lf \n", computation_time);
+	computation_time = end_time - start_time;
+	printf("%lf \n", computation_time);
 	
 	return 0;
 }
