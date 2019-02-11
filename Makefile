@@ -25,9 +25,7 @@ OUTPUT_DIR = $(OBJ_DIR) $(BIN_DIR)
 .PHONY: all
 all:
 	make directories
-	make $(BIN_DIR)/seq
-	make $(BIN_DIR)/pt
-	make $(BIN_DIR)/omp
+	make $(BIN_DIR)/seq $(BIN_DIR)/pt $(BIN_DIR)/omp
 
 .PHONY: directories
 directories:
@@ -38,11 +36,11 @@ directories:
 # BIN/Executable Rules
 # seq exec
 $(BIN_DIR)/seq: $(OBJ_DIR)/main_sequential.o $(OBJ_DIR)/lab1_sequential.o $(OBJ_DIR)/lab1_io.o
-	$(CXX) $^ -o $@ $(SHARED_LINK_FLAGS)
+	$(CXX) $^ -o $@ $(SHARED_LINK_FLAGS) -lomp -lpthread
 
 # pt exec
 $(BIN_DIR)/pt: $(OBJ_DIR)/main_pthread.o $(OBJ_DIR)/lab1_pthread.o $(OBJ_DIR)/lab1_io.o
-	$(CXX) $^ -o $@ $(SHARED_LINK_FLAGS) -lpthread
+	$(CXX) $^ -o $@ $(SHARED_LINK_FLAGS) -lomp -lpthread
 
 # omp exec
 $(BIN_DIR)/omp: $(OBJ_DIR)/main_omp.o $(OBJ_DIR)/lab1_omp.o $(OBJ_DIR)/lab1_io.o
@@ -57,7 +55,7 @@ $(OBJ_DIR)/lab1_omp.o: $(SRC_DIR)/lab1_omp.cpp
 	$(CXX) -fopenmp $(CXX_ASSEMBLER_FLAGS) -c $^ -o $@ $(INCLUDE_FLAGS)
 
 $(OBJ_DIR)/%.o: $(SRC_DIR)/%.c
-	gcc $(GCC_ASSEMBLER_FLAGS) -c $^ -o $@ $(INCLUDE_FLAGS)
+	gcc -fopenmp $(GCC_ASSEMBLER_FLAGS) -c $^ -o $@ $(INCLUDE_FLAGS)
 
 .PHONY: clean
 clean:
