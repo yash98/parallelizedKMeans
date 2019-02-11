@@ -10,6 +10,7 @@ extern "C" {
 #include <cmath>
 #include <iostream>
 #include <pthread.h>
+#include <unistd.h>
 
 std::vector<int>* numOfPointsInPartition;
 std::vector<double>*currentCentroidsDouble;
@@ -20,6 +21,7 @@ int Ng;
 int Kg;
 int threadNumG;
 int* tidArr;
+int cacheLineSizeBlock;
 
 void* meanOfPartition(void* tid) {
     int* id = (int*) tid;
@@ -29,9 +31,9 @@ void* meanOfPartition(void* tid) {
             int pickedX = *(data_pointsG+(3*i));
             int pickedY = *(data_pointsG+(3*i)+1);
             int pickedZ = *(data_pointsG+(3*i)+2);
-            (*currentCentroidsDouble)[(3*partitionId)] += pickedX;
-            (*currentCentroidsDouble)[(3*partitionId)+1] += pickedY;
-            (*currentCentroidsDouble)[(3*partitionId)+2] += pickedZ;
+            (*currentCentroidsDouble)[(partitionId*cacheLineSizeBlock)] += pickedX;
+            (*currentCentroidsDouble)[(partitionId*cacheLineSizeBlock)+1] += pickedY;
+            (*currentCentroidsDouble)[(partitionId*cacheLineSizeBlock)+2] += pickedZ;
             (*numOfPointsInPartition)[partitionId] += 1;
         }
     }
@@ -53,9 +55,9 @@ void* assignPartition(void* tid) {
         int pickedY = *(data_pointsG+(3*i)+1);
         int pickedZ = *(data_pointsG+(3*i)+2);
         for (int j=0; j<Kg; j++) {
-            double jThCurrCentX = (*currentCentroidsDouble)[(3*j)];
-            double jThCurrCentY = (*currentCentroidsDouble)[(3*j)+1];
-            double jThCurrCentZ = (*currentCentroidsDouble)[(3*j)+2];
+            double jThCurrCentX = (*currentCentroidsDouble)[(j*cacheLineSizeBlock)];
+            double jThCurrCentY = (*currentCentroidsDouble)[(j*cacheLineSizeBlock)+1];
+            double jThCurrCentZ = (*currentCentroidsDouble)[(j*cacheLineSizeBlock)+2];
             double currCentDistance = pow(pickedX-jThCurrCentX,2)+pow(pickedY-jThCurrCentY,2)+pow(pickedZ-jThCurrCentZ,2);
             if (currCentDistance<minDistance) {
                 minDistance = currCentDistance;
@@ -98,11 +100,16 @@ int** centroids, int* num_iterations) {
     Kg = K;
     threadNumG = num_threads;
 
+    cacheLineSizeBlock = (int) ceil(double(sysconf(_SC_LEVEL1_DCACHE_LINESIZE))/double(sizeof(double)));
+
     std::vector<int>* centroidSaveDB = new std::vector<int>();
+    centroidSaveDB->reserve(3*K*201);
     currentCentroidsDouble = new std::vector<double>(3*K);
+    currentCentroidsDouble = new std::vector<double>(K*cacheLineSizeBlock);
     
     // Initialize centroids
-    srand(time(0));
+    // srand(time(0));
+    srand(0);
     int numRandomCentInit = 0;
     while(numRandomCentInit<K) {
         int pickIndex = rand()%N;
@@ -113,9 +120,9 @@ int** centroids, int* num_iterations) {
         // check no centroid is repeated
         bool matched = false;
         for (int i=0; i<numRandomCentInit; i++) {
-            int iThCurrCentX = (*currentCentroidsDouble)[(3*i)];
-            int iThCurrCentY = (*currentCentroidsDouble)[(3*i)+1];
-            int iThCurrCentZ = (*currentCentroidsDouble)[(3*i)+2];
+            int iThCurrCentX = (*currentCentroidsDouble)[(i*cacheLineSizeBlock)];
+            int iThCurrCentY = (*currentCentroidsDouble)[(i*cacheLineSizeBlock)+1];
+            int iThCurrCentZ = (*currentCentroidsDouble)[(i*cacheLineSizeBlock)+2];
             if (pickedX==iThCurrCentX & pickedY==iThCurrCentY & pickedZ==iThCurrCentZ) {
                 matched = true;
                 break;
@@ -124,15 +131,18 @@ int** centroids, int* num_iterations) {
 
         // pickable centroid found
         if (!matched) {
-            (*currentCentroidsDouble)[3*numRandomCentInit] = pickedX;
-            (*currentCentroidsDouble)[3*numRandomCentInit+1] = pickedY;
-            (*currentCentroidsDouble)[3*numRandomCentInit+2] = pickedZ;
+            (*currentCentroidsDouble)[numRandomCentInit*cacheLineSizeBlock] = pickedX;
+            (*currentCentroidsDouble)[numRandomCentInit*cacheLineSizeBlock+1] = pickedY;
+            (*currentCentroidsDouble)[numRandomCentInit*cacheLineSizeBlock+2] = pickedZ;
             numRandomCentInit++;
         }
     }
 
     // successfully pick random points as centroids (Forgy)
-    centroidSaveDB->insert(centroidSaveDB->end(), currentCentroidsDouble->begin(), currentCentroidsDouble->end());
+    for (int i=0; i<K; i++) {
+        centroidSaveDB->insert(centroidSaveDB->end(), currentCentroidsDouble->begin()+i*cacheLineSizeBlock, 
+        currentCentroidsDouble->begin()+i*cacheLineSizeBlock+3);
+    }
 
     // update centroids
     *num_iterations = -1;
@@ -143,10 +153,10 @@ int** centroids, int* num_iterations) {
     std::vector<double>* prevCentroidsDouble;
     bool zeroThIteration = true;
 
-    while (error>1.0) {
+    while (error>1.0 && (*num_iterations<200)) {
         if (!zeroThIteration) {
             // compute centroids
-            currentCentroidsDouble = new std::vector<double>(3*K);
+            currentCentroidsDouble = new std::vector<double>(K*cacheLineSizeBlock);
             for (int i=0; i<K; i++) {
                 // initialize memory of next set of centroids this will contain sum of points of partition temporarily
                 (*numOfPointsInPartition)[i] = 0;
@@ -165,17 +175,20 @@ int** centroids, int* num_iterations) {
 
             // calculate avgs i.e. centroids
             for (int i=0; i<K; i++) {
-                int iThCurrCentX = (*currentCentroidsDouble)[(3*i)];
-                int iThCurrCentY = (*currentCentroidsDouble)[(3*i)+1];
-                int iThCurrCentZ = (*currentCentroidsDouble)[(3*i)+2];
+                int iThCurrCentX = (*currentCentroidsDouble)[(i*cacheLineSizeBlock)];
+                int iThCurrCentY = (*currentCentroidsDouble)[(i*cacheLineSizeBlock)+1];
+                int iThCurrCentZ = (*currentCentroidsDouble)[(i*cacheLineSizeBlock)+2];
                 double denominator = double((*numOfPointsInPartition)[i]);
-                (*currentCentroidsDouble)[(3*i)] = round(double(iThCurrCentX)/denominator);
-                (*currentCentroidsDouble)[(3*i)+1] = round(double(iThCurrCentY)/denominator);
-                (*currentCentroidsDouble)[(3*i)+2] = round(double(iThCurrCentZ)/denominator);
+                (*currentCentroidsDouble)[(i*cacheLineSizeBlock)] = round(double(iThCurrCentX)/denominator);
+                (*currentCentroidsDouble)[(i*cacheLineSizeBlock)+1] = round(double(iThCurrCentY)/denominator);
+                (*currentCentroidsDouble)[(i*cacheLineSizeBlock)+2] = round(double(iThCurrCentZ)/denominator);
             }
 
             // complete update of centroids
-            centroidSaveDB->insert(centroidSaveDB->end(), currentCentroidsDouble->begin(), currentCentroidsDouble->end());
+            for (int i=0; i<K; i++) {
+                centroidSaveDB->insert(centroidSaveDB->end(), currentCentroidsDouble->begin()+i*cacheLineSizeBlock, 
+                currentCentroidsDouble->begin()+i*cacheLineSizeBlock+3);
+            }
         }
 
         // assign partition
@@ -193,12 +206,12 @@ int** centroids, int* num_iterations) {
         if (!zeroThIteration) {
             error = 0.0;
             for (int i=0; i<K; i++) {
-                double iThCurrCentX = (*currentCentroidsDouble)[(3*i)];
-                double iThCurrCentY = (*currentCentroidsDouble)[(3*i)+1];
-                double iThCurrCentZ = (*currentCentroidsDouble)[(3*i)+2];
-                double iThPrevCentX = (*prevCentroidsDouble)[(3*i)];
-                double iThPrevCentY = (*prevCentroidsDouble)[(3*i)+1];
-                double iThPrevCentZ = (*prevCentroidsDouble)[(3*i)+2];
+                double iThCurrCentX = (*currentCentroidsDouble)[(i*cacheLineSizeBlock)];
+                double iThCurrCentY = (*currentCentroidsDouble)[(i*cacheLineSizeBlock)+1];
+                double iThCurrCentZ = (*currentCentroidsDouble)[(i*cacheLineSizeBlock)+2];
+                double iThPrevCentX = (*prevCentroidsDouble)[(i*cacheLineSizeBlock)];
+                double iThPrevCentY = (*prevCentroidsDouble)[(i*cacheLineSizeBlock)+1];
+                double iThPrevCentZ = (*prevCentroidsDouble)[(i*cacheLineSizeBlock)+2];
                 error += pow(iThCurrCentX-iThPrevCentX, 2) + pow(iThCurrCentY-iThPrevCentY, 2) + pow(iThCurrCentZ-iThPrevCentZ, 2);
             }
             prevCentroidsDouble->clear();
